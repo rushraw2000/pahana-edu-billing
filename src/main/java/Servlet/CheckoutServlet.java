@@ -1,77 +1,34 @@
 package Servlet;
 
+import Dao.BillDAO;
+
 import javax.servlet.ServletException;
 import javax.servlet.annotation.WebServlet;
 import javax.servlet.http.*;
 import java.io.IOException;
-import java.util.List;
+import java.sql.SQLException;
+import java.util.Map;
 
-@WebServlet("/customers")
-public class CustomerServlet extends HttpServlet {
-    private CustomerDAO customerDAO = new CustomerDAO();
+@WebServlet("/checkout")
+public class CheckoutServlet extends HttpServlet {
+    private final BillDAO billDAO = new BillDAO();
 
+    @SuppressWarnings("unchecked")
     @Override
-    protected void doGet(HttpServletRequest request, HttpServletResponse response)
-            throws ServletException, IOException {
+    protected void doPost(HttpServletRequest req, HttpServletResponse resp) throws ServletException, IOException {
+        HttpSession session = req.getSession(false);
+        if (session == null) { resp.sendRedirect("products"); return; }
+        Map<Integer, Integer> cart = (Map<Integer, Integer>) session.getAttribute("CART");
+        if (cart == null || cart.isEmpty()) { resp.sendRedirect("cart"); return; }
 
-        String action = request.getParameter("action");
-
-        if ("edit".equals(action)) {
-            String accountNumber = request.getParameter("account");
-            Customer customer = customerDAO.getCustomer(accountNumber);
-            request.setAttribute("customer", customer);
-            request.getRequestDispatcher("/WEB-INF/views/customer-form.jsp").forward(request, response);
-        } else {
-            List<Customer> customers = customerDAO.getAllCustomers();
-            request.setAttribute("customers", customers);
-            request.getRequestDispatcher("/WEB-INF/views/customer-management.jsp").forward(request, response);
+        String customerAccount = req.getParameter("customerAccount");
+        try {
+            int billId = billDAO.createBill(customerAccount, cart);
+            session.removeAttribute("CART");
+            resp.sendRedirect("bill.jsp?billId=" + billId);
+        } catch (SQLException ex) {
+            req.setAttribute("error", ex.getMessage());
+            req.getRequestDispatcher("/cart.jsp").forward(req, resp);
         }
-    }
-
-    @Override
-    protected void doPost(HttpServletRequest request, HttpServletResponse response)
-            throws ServletException, IOException {
-
-        String action = request.getParameter("action");
-
-        if ("add".equals(action)) {
-            Customer customer = new Customer(
-                    request.getParameter("accountNumber"),
-                    request.getParameter("customerName"),
-                    request.getParameter("address"),
-                    request.getParameter("telephone"),
-                    request.getParameter("email")
-            );
-
-            if (customerDAO.addCustomer(customer)) {
-                request.setAttribute("success", "Customer added successfully");
-            } else {
-                request.setAttribute("error", "Failed to add customer");
-            }
-        } else if ("update".equals(action)) {
-            Customer customer = new Customer(
-                    request.getParameter("accountNumber"),
-                    request.getParameter("customerName"),
-                    request.getParameter("address"),
-                    request.getParameter("telephone"),
-                    request.getParameter("email")
-            );
-
-            if (customerDAO.updateCustomer(customer)) {
-                request.setAttribute("success", "Customer updated successfully");
-            } else {
-                request.setAttribute("error", "Failed to update customer");
-            }
-        } else if ("delete".equals(action)) {
-            String accountNumber = request.getParameter("accountNumber");
-
-            if (customerDAO.deleteCustomer(accountNumber)) {
-                request.setAttribute("success", "Customer deleted successfully");
-            } else {
-                request.setAttribute("error", "Failed to delete customer");
-            }
-        }
-
-        response.sendRedirect("customers");
     }
 }
