@@ -1,6 +1,6 @@
 package app;
 
-import db.DBconnection;
+import util.DBconnection;
 
 import java.sql.Connection;
 public class Main {
